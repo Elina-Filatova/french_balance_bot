@@ -1,0 +1,3 @@
+aiogram
+pandas
+python-dotenv
