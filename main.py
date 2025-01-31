@@ -52,6 +52,12 @@ def print_balance_table():
     return text
 
 
+@dp.message_handler(commands=["start"])
+async def send_balance(message: types.Message):
+    """Выводит текущий баланс"""
+    await message.reply("🤗 Welcome my dear friend!")
+
+
 @dp.message_handler(commands=["balance"])
 async def send_balance(message: types.Message):
     """Выводит текущий баланс"""
