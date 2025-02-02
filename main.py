@@ -185,7 +185,7 @@ class BalanceBot:
 
     def register_handlers(self):
         """Регистрирует обработчики команд для бота."""
-        self.dp.register_message_handler(self.intro, commands=["intro"])
+        self.dp.register_message_handler(self.intro, commands=["start"])
         self.dp.register_message_handler(self.send_balance, commands=["balance"])
         self.dp.register_message_handler(
             self.update_balance, commands=["update_balance"]
