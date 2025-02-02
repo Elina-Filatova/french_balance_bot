@@ -5,7 +5,6 @@ import psycopg2
 from aiogram import Bot, Dispatcher, executor, types
 from dotenv import load_dotenv
 
-# Словарь для перевода названий дней (при необходимости)
 DAYS_RUSSIAN = {
     "Monday": "Понедельник",
     "Tuesday": "Вторник",
@@ -16,7 +15,6 @@ DAYS_RUSSIAN = {
     "Sunday": "Воскресенье",
 }
 
-# Загрузка переменных окружения
 load_dotenv()
 API_TOKEN = os.getenv("API_TOKEN")
 
@@ -73,50 +71,44 @@ class BalanceDB:
 
     def add_balance_entry(self, date=None):
         """
-        Добавляет новую запись баланса для сегодняшней даты.
+        Добавляет новую запись баланса для указанной даты (или для сегодняшней, если не передана).
 
         Возвращает:
             tuple: (успех: bool, сообщение: str)
         """
         conn = self.get_connection()
         cur = conn.cursor()
+
         if not date:
-            date = datetime.today().strftime("%Y-%m-%d")
-            day_of_week = datetime.now().strftime("%A")
+            date_obj = datetime.today().date()
+            day_of_week = date_obj.strftime("%A")
         else:
-            date = datetime.strptime(date, "%Y-%m-%d")
-            day_of_week = date.strftime("%A")
+            date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+            day_of_week = date_obj.strftime("%A")
 
         day_of_week_ru = DAYS_RUSSIAN[day_of_week]
 
-        # Проверка: запись за сегодня уже существует?
-        cur.execute("SELECT date FROM balance WHERE date = %s", (date,))
+        # Проверка: запись за указанную дату уже существует?
+        cur.execute("SELECT date FROM balance WHERE date = %s", (date_obj,))
         if cur.fetchone():
             cur.close()
             conn.close()
-            return False, f"🤗 Баланс за {date} уже обновлен!"
+            return False, f"🤗 Баланс за {date_obj} уже обновлен!"
 
         entries = self.get_all_balance_entries()
 
         if not entries:
             balance = 20
-            cur.execute(
-                """
-                INSERT INTO balance (date, day_of_week, price, balance)
-                VALUES (%s, %s, %s, %s);
-                """,
-                (date, day_of_week_ru, 20, balance),
-            )
         else:
-            # Новый баланс = предыдущий баланс + 20
             balance = entries[-1][3] + 20
-            cur.execute(
-                """
-                INSERT INTO balance (date, day_of_week, price, balance)
-                VALUES (%s, %s, %s, %s);
-                """,
-                (date, day_of_week_ru, 20, balance),
-            )
+
+        cur.execute(
+            """
+            INSERT INTO balance (date, day_of_week, price, balance)
+            VALUES (%s, %s, %s, %s);
+            """,
+            (date_obj, day_of_week_ru, 20, balance),
+        )
 
         conn.commit()
         cur.close()
@@ -259,10 +251,8 @@ class BalanceBot:
 
 
 if __name__ == "__main__":
-    # Инициализируем менеджер базы данных и создаём таблицу, если она отсутствует
     db = BalanceDB()
     db.create_balance_table()
 
-    # Инициализируем и запускаем Telegram-бота
     balance_bot = BalanceBot(API_TOKEN, db)
     balance_bot.run()
