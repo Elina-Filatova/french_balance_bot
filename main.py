@@ -210,8 +210,13 @@ class BalanceBot:
 
     async def update_balance(self, message: types.Message):
         """Обработчик команды /update_balance. Добавляет новую запись баланса."""
+        date_arg = message.get_args().strip()
         try:
-            success, msg = self.db.add_balance_entry()
+            if date_arg:
+                success, msg = self.db.add_balance_entry(date_arg)
+            else:
+                success, msg = self.db.add_balance_entry()
+
             if success:
                 balance_table_text = self.format_balance_table()
                 await message.reply(f"✅ {msg}\n\n{balance_table_text}")
