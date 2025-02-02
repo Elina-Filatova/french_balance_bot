@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 
+import pandas as pd
 import psycopg2
 from aiogram import Bot, Dispatcher, executor, types
 from dotenv import load_dotenv
@@ -86,29 +87,44 @@ class BalanceDB:
             date_obj = datetime.strptime(date, "%Y-%m-%d").date()
             day_of_week = date_obj.strftime("%A")
 
-        day_of_week_ru = DAYS_RUSSIAN[day_of_week]
-
-        # Проверка: запись за указанную дату уже существует?
+        day_of_week_ru = DAYS_RUSSIAN.get(day_of_week, day_of_week)
         cur.execute("SELECT date FROM balance WHERE date = %s", (date_obj,))
         if cur.fetchone():
             cur.close()
             conn.close()
             return False, f"🤗 Баланс за {date_obj} уже обновлен!"
 
-        entries = self.get_all_balance_entries()
-
-        if not entries:
-            balance = 20
+        cur.execute(
+            "SELECT balance FROM balance WHERE date < %s ORDER BY date DESC LIMIT 1",
+            (date_obj,),
+        )
+        previous = cur.fetchone()
+        if previous:
+            previous_balance = previous[0]
         else:
-            balance = entries[-1][3] + 20
+            previous_balance = 0
+
+        new_balance = previous_balance + 20
 
         cur.execute(
             """
             INSERT INTO balance (date, day_of_week, price, balance)
             VALUES (%s, %s, %s, %s);
             """,
-            (date_obj, day_of_week_ru, 20, balance),
+            (date_obj, day_of_week_ru, 20, new_balance),
         )
+        cur.execute(
+            "SELECT date, price FROM balance WHERE date > %s ORDER BY date", (date_obj,)
+        )
+        subsequent_entries = cur.fetchall()
+
+        current_balance = new_balance
+        for entry_date, price in subsequent_entries:
+            current_balance += price
+            cur.execute(
+                "UPDATE balance SET balance = %s WHERE date = %s",
+                (current_balance, entry_date),
+            )
 
         conn.commit()
         cur.close()
