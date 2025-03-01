@@ -15,6 +15,8 @@ DAYS_RUSSIAN = {
     "Sunday": "Воскресенье",
 }
 
+CURRENT_MONTH = datetime.today().month
+
 load_dotenv()
 API_TOKEN = os.getenv("API_TOKEN")
 
@@ -201,7 +203,7 @@ class BalanceBot:
 
     async def send_balance(self, message: types.Message):
         """Обработчик команды /balance. Отправляет текущую таблицу баланса."""
-        entries = self.db.get_all_balance_entries(month=datetime.today().month)
+        entries = self.db.get_all_balance_entries(month=CURRENT_MONTH)
         if not entries:
             await message.reply(
                 "⚠️ Баланс не найден. Добавьте данные с помощью /update_balance."
@@ -248,7 +250,7 @@ class BalanceBot:
 
     def format_balance_table(self):
         """Форматирует таблицу баланса для отправки в Telegram."""
-        entries = self.db.get_all_balance_entries(month=datetime.today().month)
+        entries = self.db.get_all_balance_entries(month=CURRENT_MONTH)
         if not entries:
             return "Нет данных о балансе."
         text = "📊 Текущая таблица баланса (накопительный баланс по месяцам):\n\n"
