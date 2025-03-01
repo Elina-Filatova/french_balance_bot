@@ -57,14 +57,20 @@ class BalanceDB:
         cur.close()
         conn.close()
 
-    def get_all_balance_entries(self):
+    def get_all_balance_entries(self, month=None):
         """
         Получает все записи баланса, отсортированные по дате.
         Вычисляет накопительный баланс в пределах каждого месяца.
         """
+        if month:
+            try:
+                month = int(month)
+                if month < 1 or month > 12:
+                    return "Месяц должен быть в диапазоне от 1 до 12."
+            except ValueError:
+                return
         conn = self.get_connection()
         cur = conn.cursor()
-        current_month = datetime.today().month
         cur.execute(
             f"""
             SELECT 
@@ -76,7 +82,7 @@ class BalanceDB:
                     ORDER BY date
                 ) AS monthly_balance
             FROM balance
-            WHERE EXTRACT(MONTH FROM date) = {current_month}
+            WHERE EXTRACT(MONTH FROM date) = {month}
             ORDER BY date;
             """
         )
@@ -196,7 +202,7 @@ class BalanceBot:
 
     async def send_balance(self, message: types.Message):
         """Обработчик команды /balance. Отправляет текущую таблицу баланса."""
-        entries = self.db.get_all_balance_entries()
+        entries = self.db.get_all_balance_entries(month=datetime.today().month)
         if not entries:
             await message.reply(
                 "⚠️ Баланс не найден. Добавьте данные с помощью /update_balance."
