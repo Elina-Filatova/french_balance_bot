@@ -66,14 +66,14 @@ class BalanceDB:
             try:
                 month = int(month)
                 if month < 1 or month > 12:
-                    return "Месяц должен быть в диапазоне от 1 до 12."
+                    return "Месяц должен быть в диапазоне от 1 до 12. Пример: '/balance 2' - покажет данные за февраль."
             except ValueError:
-                return "Неверный формат месяца. Введите число от 1 до 12."
+                return "Неверный формат месяца. Введите число от 1 до 12. Пример: '/balance 2' - покажет данные за февраль."
 
         conn = self.get_connection()
         cur = conn.cursor()
         cur.execute(
-            f"""
+            """
             SELECT 
                 date, 
                 day_of_week, 
@@ -83,10 +83,12 @@ class BalanceDB:
                     ORDER BY date
                 ) AS monthly_balance
             FROM balance
-            WHERE EXTRACT(MONTH FROM date) = {month}
+            WHERE EXTRACT(MONTH FROM date) = %s
             ORDER BY date;
-            """
+            """,
+            (month,),
         )
+
         rows = cur.fetchall()
         cur.close()
         conn.close()
@@ -202,17 +204,17 @@ class BalanceBot:
         await message.reply(text)
 
     async def send_balance(self, message: types.Message):
-        """Обработчик команды /balance. Отправляет текущую таблицу баланса."""
-        entries = self.db.get_all_balance_entries(month=CURRENT_MONTH)
+        month_arg = message.get_args().strip()
+        month = month_arg if month_arg else None
+        entries = self.db.get_all_balance_entries(month)
         if not entries:
             await message.reply(
                 "⚠️ Баланс не найден. Добавьте данные с помощью /update_balance."
             )
             return
 
-        text = "📊 Текущая таблица баланса (накопительный баланс по месяцам):\n\n"
+        text = "📊 Текущая таблица баланса:\n\n"
         for row in entries:
-            # row: (date, day_of_week, price, monthly_balance)
             text += (
                 f"📅 Дата: {row[0]} ({row[1]})\n"
                 f"💰 Цена: {row[2]}€\n"
@@ -227,11 +229,13 @@ class BalanceBot:
         try:
             if date_arg:
                 success, msg = self.db.add_balance_entry(date_arg)
+                month = date_arg.split("-")[1]
+                balance_table_text = self.format_balance_table(month)
             else:
                 success, msg = self.db.add_balance_entry()
+                balance_table_text = self.format_balance_table()
 
             if success:
-                balance_table_text = self.format_balance_table()
                 await message.reply(f"✅ {msg}\n\n{balance_table_text}")
             else:
                 await message.reply(f"⚠️ {msg}")
@@ -242,15 +246,16 @@ class BalanceBot:
         """Обработчик команды /delete_balance. Удаляет запись по дате."""
         date = message.get_args()
         success, msg = self.db.delete_balance_entry_by_date(date)
+        month = date.split("-")[1]
         if success:
-            balance_table_text = self.format_balance_table()
+            balance_table_text = self.format_balance_table(month)
             await message.reply(f"✅ {msg}\n\n{balance_table_text}")
         else:
             await message.reply(f"❌ {msg}")
 
-    def format_balance_table(self):
+    def format_balance_table(self, month=None):
         """Форматирует таблицу баланса для отправки в Telegram."""
-        entries = self.db.get_all_balance_entries(month=CURRENT_MONTH)
+        entries = self.db.get_all_balance_entries(month=month)
         if not entries:
             return "Нет данных о балансе."
         text = "📊 Текущая таблица баланса (накопительный баланс по месяцам):\n\n"
