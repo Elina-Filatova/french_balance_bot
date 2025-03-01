@@ -207,6 +207,7 @@ class BalanceBot:
         self.dp.register_message_handler(
             self.delete_balance, commands=["delete_balance"]
         )
+        self.dp.register_message_handler(self.updates, commands=["updates"])
 
     async def intro(self, message: types.Message):
         """Обработчик команды /start."""
@@ -288,11 +289,13 @@ class BalanceBot:
             await message.reply(f"❌ {msg}")
 
     def format_balance_table(self, month=None):
-        """Форматирует таблицу баланса для отправки в Telegram."""
-        entries = self.db.get_all_balance_entries(month=month)
+        month_num = int(month) if month else CURRENT_MONTH
+
+        entries = self.db.get_all_balance_entries(month=month_num)
         if not entries:
             return "Нет данных о балансе."
-        month_rus = MONTHS_RUSSIAN.get(int(month), MONTHS_RUSSIAN.get(CURRENT_MONTH))
+
+        month_rus = MONTHS_RUSSIAN.get(month_num, MONTHS_RUSSIAN.get(CURRENT_MONTH))
         text = f"📊 Текущая таблица баланса за {month_rus}:\n\n"
         for row in entries:
             text += (
