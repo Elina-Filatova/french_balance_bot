@@ -64,8 +64,9 @@ class BalanceDB:
         """
         conn = self.get_connection()
         cur = conn.cursor()
+        current_month = datetime.today().month
         cur.execute(
-            """
+            f"""
             SELECT 
                 date, 
                 day_of_week, 
@@ -75,6 +76,7 @@ class BalanceDB:
                     ORDER BY date
                 ) AS monthly_balance
             FROM balance
+            WHERE EXTRACT(MONTH FROM date) = {current_month}
             ORDER BY date;
             """
         )
