@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 
-import pandas as pd
 import psycopg2
 from aiogram import Bot, Dispatcher, executor, types
 from dotenv import load_dotenv
@@ -59,11 +58,25 @@ class BalanceDB:
         conn.close()
 
     def get_all_balance_entries(self):
-        """Получает все записи баланса, отсортированные по дате."""
+        """
+        Получает все записи баланса, отсортированные по дате.
+        Вычисляет накопительный баланс в пределах каждого месяца.
+        """
         conn = self.get_connection()
         cur = conn.cursor()
         cur.execute(
-            "SELECT date, day_of_week, price, balance FROM balance ORDER BY date;"
+            """
+            SELECT 
+                date, 
+                day_of_week, 
+                price, 
+                SUM(price) OVER (
+                    PARTITION BY DATE_TRUNC('month', date)
+                    ORDER BY date
+                ) AS monthly_balance
+            FROM balance
+            ORDER BY date;
+            """
         )
         rows = cur.fetchall()
         cur.close()
@@ -73,6 +86,7 @@ class BalanceDB:
     def add_balance_entry(self, date=None):
         """
         Добавляет новую запись баланса для указанной даты (или для сегодняшней, если не передана).
+        Теперь баланс рассчитывается на лету для каждого месяца, поэтому не обновляем последующие записи.
 
         Возвращает:
             tuple: (успех: bool, сообщение: str)
@@ -95,37 +109,12 @@ class BalanceDB:
             return False, f"🤗 Баланс за {date_obj} уже обновлен!"
 
         cur.execute(
-            "SELECT balance FROM balance WHERE date < %s ORDER BY date DESC LIMIT 1",
-            (date_obj,),
-        )
-        previous = cur.fetchone()
-        if previous:
-            previous_balance = previous[0]
-        else:
-            previous_balance = 0
-
-        new_balance = previous_balance + 20
-
-        cur.execute(
             """
             INSERT INTO balance (date, day_of_week, price, balance)
             VALUES (%s, %s, %s, %s);
             """,
-            (date_obj, day_of_week_ru, 20, new_balance),
+            (date_obj, day_of_week_ru, 20, 20),
         )
-        cur.execute(
-            "SELECT date, price FROM balance WHERE date > %s ORDER BY date", (date_obj,)
-        )
-        subsequent_entries = cur.fetchall()
-
-        current_balance = new_balance
-        for entry_date, price in subsequent_entries:
-            current_balance += price
-            cur.execute(
-                "UPDATE balance SET balance = %s WHERE date = %s",
-                (current_balance, entry_date),
-            )
-
         conn.commit()
         cur.close()
         conn.close()
@@ -151,14 +140,12 @@ class BalanceDB:
             conn = self.get_connection()
             cur = conn.cursor()
 
-            # Проверяем наличие записи
             cur.execute("SELECT date FROM balance WHERE date = %s", (date,))
             if not cur.fetchone():
                 cur.close()
                 conn.close()
                 return False, "Данные за это число не найдены!"
 
-            # Удаляем запись
             cur.execute("DELETE FROM balance WHERE date = %s;", (date,))
             conn.commit()
             cur.close()
@@ -195,7 +182,7 @@ class BalanceBot:
         )
 
     async def intro(self, message: types.Message):
-        """Обработчик команды /intro."""
+        """Обработчик команды /start."""
         text = (
             "Bonjour, девочки! Я ваш верный помощник Франсис 🥰 и вот что я умею:\n\n"
             "📊 Управление балансом:\n"
@@ -214,12 +201,13 @@ class BalanceBot:
             )
             return
 
-        text = "📊 Текущая таблица баланса:\n\n"
+        text = "📊 Текущая таблица баланса (накопительный баланс по месяцам):\n\n"
         for row in entries:
+            # row: (date, day_of_week, price, monthly_balance)
             text += (
                 f"📅 Дата: {row[0]} ({row[1]})\n"
                 f"💰 Цена: {row[2]}€\n"
-                f"📈 Баланс: {row[3]}€\n"
+                f"📈 Баланс за месяц: {row[3]}€\n"
                 "➖➖➖➖➖➖➖➖➖\n"
             )
         await message.reply(text)
@@ -256,12 +244,12 @@ class BalanceBot:
         entries = self.db.get_all_balance_entries()
         if not entries:
             return "Нет данных о балансе."
-        text = "📊 Текущая таблица баланса:\n\n"
+        text = "📊 Текущая таблица баланса (накопительный баланс по месяцам):\n\n"
         for row in entries:
             text += (
                 f"📅 Дата: {row[0]} ({row[1]})\n"
                 f"💰 Цена: {row[2]}€\n"
-                f"📈 Баланс: {row[3]}€\n"
+                f"📈 Баланс за месяц: {row[3]}€\n"
                 "➖➖➖➖➖➖➖➖➖\n"
             )
         return text
