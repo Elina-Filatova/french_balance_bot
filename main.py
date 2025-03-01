@@ -58,17 +58,16 @@ class BalanceDB:
         conn.close()
 
     def get_all_balance_entries(self, month=None):
-        """
-        Получает все записи баланса, отсортированные по дате.
-        Вычисляет накопительный баланс в пределах каждого месяца.
-        """
-        if month:
+        if month is None or not month:
+            month = datetime.today().month
+        else:
             try:
                 month = int(month)
                 if month < 1 or month > 12:
                     return "Месяц должен быть в диапазоне от 1 до 12."
             except ValueError:
-                return
+                return "Неверный формат месяца. Введите число от 1 до 12."
+
         conn = self.get_connection()
         cur = conn.cursor()
         cur.execute(
@@ -249,7 +248,7 @@ class BalanceBot:
 
     def format_balance_table(self):
         """Форматирует таблицу баланса для отправки в Telegram."""
-        entries = self.db.get_all_balance_entries()
+        entries = self.db.get_all_balance_entries(month=datetime.today().month)
         if not entries:
             return "Нет данных о балансе."
         text = "📊 Текущая таблица баланса (накопительный баланс по месяцам):\n\n"
