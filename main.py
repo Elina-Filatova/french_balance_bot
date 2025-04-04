@@ -31,7 +31,6 @@ MONTHS_RUSSIAN = {
 }
 
 
-CURRENT_MONTH = datetime.today().month
 
 load_dotenv()
 API_TOKEN = os.getenv("API_TOKEN")
@@ -289,13 +288,13 @@ class BalanceBot:
             await message.reply(f"❌ {msg}")
 
     def format_balance_table(self, month=None):
-        month_num = int(month) if month else CURRENT_MONTH
+        month_num = int(month) if month else datetime.today().month
 
         entries = self.db.get_all_balance_entries(month=month_num)
         if not entries:
             return "Нет данных о балансе."
 
-        month_rus = MONTHS_RUSSIAN.get(month_num, MONTHS_RUSSIAN.get(CURRENT_MONTH))
+        month_rus = MONTHS_RUSSIAN.get(month_num, MONTHS_RUSSIAN.get(datetime.today().month))
         text = f"📊 Текущий баланс за {month_rus}:\n\n"
         for row in entries:
             text += (
